@@ -1,19 +1,21 @@
 #include <stdio.h>
 #include <thread>
-
+#include <cstdlib>
 #include "CycleTimer.h"
 
-typedef struct {
+typedef struct
+{
     float x0, x1;
     float y0, y1;
     unsigned int width;
     unsigned int height;
     int maxIterations;
-    int* output;
+    int *output;
     int threadId;
     int numThreads;
+    int begin;
+    int step;
 } WorkerArgs;
-
 
 extern void mandelbrotSerial(
     float x0, float y0, float x1, float y1,
@@ -22,12 +24,12 @@ extern void mandelbrotSerial(
     int maxIterations,
     int output[]);
 
-
 //
 // workerThreadStart --
 //
 // Thread entrypoint.
-void workerThreadStart(WorkerArgs * const args) {
+void workerThreadStart(WorkerArgs *const args)
+{
 
     // TODO FOR CS149 STUDENTS: Implement the body of the worker
     // thread here. Each thread should make a call to mandelbrotSerial()
@@ -36,6 +38,8 @@ void workerThreadStart(WorkerArgs * const args) {
     // half of the image and thread 1 could compute the bottom half.
 
     printf("Hello world from thread %d\n", args->threadId);
+    printf("thread %d will build [%d, %d)\n", args->threadId, args->begin, args->step + args->begin);
+    mandelbrotSerial(args->x0, args->y0, args->x1, args->y1, args->width, args->height, args->begin, args->step, args->maxIterations, args->output);
 }
 
 //
@@ -61,8 +65,12 @@ void mandelbrotThread(
     std::thread workers[MAX_THREADS];
     WorkerArgs args[MAX_THREADS];
 
-    for (int i=0; i<numThreads; i++) {
-      
+    int step = height / numThreads;
+    int mod = height % numThreads;
+    int begin = 0;
+    for (int i = 0, j = 0; i < numThreads; i++, ++j)
+    {
+        int nextStep = j < mod ? 1 + step : step;
         // TODO FOR CS149 STUDENTS: You may or may not wish to modify
         // the per-thread arguments here.  The code below copies the
         // same arguments for each thread
@@ -75,22 +83,25 @@ void mandelbrotThread(
         args[i].maxIterations = maxIterations;
         args[i].numThreads = numThreads;
         args[i].output = output;
-      
         args[i].threadId = i;
+        args[i].begin = begin;
+        args[i].step = nextStep;
+        begin = begin + nextStep;
     }
 
     // Spawn the worker threads.  Note that only numThreads-1 std::threads
     // are created and the main application thread is used as a worker
     // as well.
-    for (int i=1; i<numThreads; i++) {
+    for (int i = 1; i < numThreads; i++)
+    {
         workers[i] = std::thread(workerThreadStart, &args[i]);
     }
-    
+
     workerThreadStart(&args[0]);
 
     // join worker threads
-    for (int i=1; i<numThreads; i++) {
+    for (int i = 1; i < numThreads; i++)
+    {
         workers[i].join();
     }
 }
-
